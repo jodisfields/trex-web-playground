@@ -10,7 +10,7 @@ var tmp = require('tmp');
 // Initialize express and http server
 var app = express();
 app.use("/", express.static("client"));
-var server = http.createServer(app).listen(8080);
+var server = http.createServer(app).listen(7171);
 var io = socketio(server);
 
 console.log("Starting HTTP server...");
@@ -19,7 +19,7 @@ io.on('connection', function(socket) {
     console.log("Got new connection");
 
     // Start Docker Compose service
-    exec('docker-compose up -d', (err, stdout, stderr) => {
+    exec('docker compose up -d', (err, stdout, stderr) => {
         if (err) {
             console.error('Error starting services:', stderr);
             return;
@@ -27,23 +27,21 @@ io.on('connection', function(socket) {
         console.log('Services started:', stdout);
 
         // Create terminal for console
-        socket.term = pty.spawn('docker', ['exec', '-it', 'your-console-service', '/etc/startup.sh'], {
+        socket.term = pty.spawn('docker', ['exec', '-it', 'trex', './trex-console'], {
             name: 'xterm-color',
             cols: 120,
             rows: 40,
-            cwd: process.env.HOME,
-            env: process.env
         });
 
         // Create terminal for code
-        socket.code = pty.spawn('docker', ['exec', '-it', 'your-code-service', '/etc/scripts/code.sh'], {
+        socket.code = pty.spawn('docker', ['exec', '-it', 'trex', 'zsh'], {
             name: 'xterm-color',
             cols: 120,
             rows: 40,
         });
 
         // Create terminal for tcpdump
-        socket.tcpdump = pty.spawn('docker', ['exec', '-it', 'your-tcpdump-service', 'bash', '-c', '/etc/tcpdump -i veth0'], {
+        socket.tcpdump = pty.spawn('docker', ['exec', '-it', 'frr', 'tshark', '-i', 'any'], {
             name: 'xterm-color',
             cols: 120,
             rows: 40,
@@ -99,7 +97,7 @@ io.on('connection', function(socket) {
             console.log("Socket disconnected");
 
             // Stop Docker Compose services
-            exec('docker-compose down', (err, stdout, stderr) => {
+            exec('docker compose down', (err, stdout, stderr) => {
                 if (err) {
                     console.error('Error stopping services:', stderr);
                     return;

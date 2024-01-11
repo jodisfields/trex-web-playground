@@ -40,6 +40,8 @@ services:
       - "ALL"
     environment:
       - PYTHONPATH=/v3.04/trex_client/interactive:/v3.04/trex_client/interactive/trex_stl_lib/:/v3.04/trex_client/external_libs:/v3.04/trex_client/stf
+    volumes:
+      - ./shared:/shared:rw
     command:
       ["./t-rex-64", "--stl", "--prom", "-i", "--cfg", "/etc/trex_cfg.yaml"]
     networks:
