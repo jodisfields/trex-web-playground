@@ -24,15 +24,6 @@
 </head>
 <body>
 
-<div id="trexlogo">
-<img src="images/trex_logo.png" height="10%">
-</div>
-
-<div id="dockerlogo">
-    <img src="images/Docker-Logo.png" height="10%">
-</div>
-
-
 <div id="status">
 <button id="runbutton" class="btn" style="background-color: DodgerBlue" title="Run"><i class="fa fa-play"></i></button>
 <button id="stepbutton" class="btn" style="background-color: LawnGreen" title="Step"><i class="fa fa-arrow-down"></i></button>
@@ -68,46 +59,37 @@
 
 
 <pre id="pcapcode">
-# get TRex APIs
 from trex_stl_lib.api import *
+import pprint
 
+pp = pprint.pprint
 c = STLClient(server = "127.0.0.1")
 c.connect()
 
 port_0 = 0
 port_1 = 1
+port_2 = 2
+port_3 = 3
 
 try:
     c.reset(ports = [port_0, port_1])
-
-    # push local PCAP file 'http.pcap' over port_0 with IPG of 1 ms
-    c.push_pcap("/scratch/http.pcap", ports = port_0, ipg_usec = 1000)
-
-    # hold until traffic ends
+    c.push_pcap("/v3.04/stl/sample.pcap", ports = port_1, ipg_usec = 1000)
     c.wait_on_traffic()
-
-    # check out the stats
+    
     stats = c.get_stats()
-
-    # examine stats for port_0
-    print("port_0 stats:")
-    print(stats[port_0])
-
-    # examine stats for port_1
+    
     print("port_1 stats:")
-    print(stats[port_1])
+    pp(stats[port_1])
 
 except STLError as e:
     print(e)
 
 finally:
-
     c.disconnect()
 </pre>
 
 
 <pre id="streamscode" style="visibility: hidden">
-# get TRex APIs
 from trex_stl_lib.api import *
 
 c = STLClient(server = "127.0.0.1")
@@ -115,30 +97,19 @@ c.connect()
 
 port_0 = 0
 port_1 = 1
+port_2 = 2
+port_3 = 3
 
 try:
-    # create a base pkt
     base_pkt = Ether()/IP(src="16.0.0.1",dst="48.0.0.1")/UDP(dport=12,sport=1025)
-
-    # later on we will use the packet builder to provide more properties
     pkt = STLPktBuilder(base_pkt)
-
-    # create a stream with a rate of 1000 PPS and continuous
     s1 = STLStream(packet = pkt, mode = STLTXCont(pps = 1000))
-
-    # prepare the ports
-    c.reset(ports = [port_0, port_1])
-
-    # add the streams
-    c.add_streams(s1, ports = port_0)
-
+    c.reset(ports = [port_0, port_1, port_2, port_3])
+    c.add_streams(s1, ports = port_1)
     print("Starting Traffic for 10 seconds...")
-    # start traffic with limit of 10 seconds (otherwise it will continue forever)
-    c.start(ports = port_0, duration = 10)
-
-    # hold until traffic ends
+    c.start(ports = port_1, duration = 10)
     c.wait_on_traffic()
-    print("Traffic Done !")
+    print("Done!")
 
 except STLError as e:
     print(e)

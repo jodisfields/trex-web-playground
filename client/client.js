@@ -114,7 +114,7 @@ function create_terminals() {
 
 function create_socket() {
     // Connect to the socket.io server
-    client.socket = io.connect('http://localhost:7171');
+    client.socket = io.connect('http://192.168.1.109:7171');
 
     // disconnect
     client.socket.on('disconnect', deinit);

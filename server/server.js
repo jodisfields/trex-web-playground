@@ -30,24 +30,24 @@ io.on('connection', function(socket) {
         socket.term = pty.spawn('docker', ['exec', '-it', 'trex', './trex-console'], {
             name: 'xterm-color',
             cols: 120,
-            rows: 40,
+            rows: 50,
         });
 
         // Create terminal for code
-        socket.code = pty.spawn('docker', ['exec', '-it', 'trex', 'zsh'], {
+        socket.code = pty.spawn('docker', ['exec', '-it', 'trex', 'bash'], {
             name: 'xterm-color',
             cols: 120,
             rows: 40,
         });
 
         // Create terminal for tcpdump
-        socket.tcpdump = pty.spawn('docker', ['exec', '-it', 'frr', 'tshark', '-i', 'any'], {
+        socket.tcpdump = pty.spawn('docker', ['exec', '-it', 'frr', 'tshark', '-i', 'eth1'], {
             name: 'xterm-color',
             cols: 120,
             rows: 40,
         });
 
-        var tcp_dump_buffer = Buffer('');
+        var tcp_dump_buffer = Buffer.alloc(0);
 
         // Listen on the terminal for output and send it to the client
         socket.tcpdump.on('data', function(data){
@@ -128,7 +128,7 @@ process.on('SIGINT', function () {
     console.log("\nShutting down...");
 
     // Shut down Docker Compose environment
-    exec('docker-compose down', (err, stdout, stderr) => {
+    exec('docker compose down', (err, stdout, stderr) => {
         if (err) {
             console.error('Error stopping services:', stderr);
             return;
