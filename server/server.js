@@ -40,7 +40,7 @@ io.on('connection', function(socket) {
         Tty: true,
         Volumes: {'/shared':{}},
         Binds: [`${path.resolve('shared')}:/shared`],
-        //VolumeDriver : 'shared:/shared',
+	// VolumeDriver : 'shared:/shared',
         CapAdd: ['ALL'],
     }, function (err, container) {
 
@@ -66,13 +66,13 @@ io.on('connection', function(socket) {
 
             // Create terminal for code
             // socket.code = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash', '-c', 'stty -echo;/etc/stl.sh'], {
-            socket.code = pty.spawn('docker', ['exec', '-it', socket.container.id, '/etc/scripts/code.sh'], {
+            socket.code = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash'], {
                 name: 'xterm-color',
                 cols: 120,
                 rows: 40,
             });
 
-            socket.tcpdump = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash', '-c', '/etc/tcpdump -i veth0'], {
+            socket.tcpdump = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash', '-c', '/etc/tcpdump -i any'], {
                 name: 'xterm-color',
                 cols: 120,
                 rows: 40,
