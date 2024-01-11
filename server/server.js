@@ -1,165 +1,67 @@
 const express = require('express');
 const http = require('http');
-const fs = require('fs');
-const pty = require('node-pty');
-const tmp = require('tmp');
 const path = require('path');
+const socketIO = require('socket.io');
+const { upAll, down, exec } = require('docker-compose/dist/v2');
 
-const Docker = require('dockerode');
-const docker = new Docker();
-
-require('log-timestamp');
-
-// Setup the express app
 const app = express();
-// Static file serving
 app.use('/', express.static('client'));
 
-// Creating an HTTP server
-const server = http.createServer(app).listen(7171);
+const server = http.createServer(app);
+const io = socketIO(server);
 
-const io = require('socket.io')(server);
-
-console.log('Starting HTTP server...');
-
-// When a new socket connects
-io.on('connection', function(socket) {
-
-    socket.shortid = socket.id.substr(0, 8);
-
-    console.log(`Got new connection from ${socket.request.connection.remoteAddress} @ ID: ${socket.shortid}\n`);
-
-    // generate a container
-    docker.createContainer({
-        Image: 'trexcisco/trex-dev:2.36',
-        Cmd: ['/bin/bash', '-c', '/etc/startup.sh'],
-        AttachStdin: true,
-        AttachStdout: true,
-        AttachStderr: true,
-        OpenStdin: true,
-        Tty: true,
-        Volumes: {'/shared':{}},
-        Binds: [`${path.resolve('shared')}:/shared`],
-	// VolumeDriver : 'shared:/shared',
-        CapAdd: ['ALL'],
-    }, function (err, container) {
-
-        if (err) {
-            console.log(err);
-            process.exit('assert');
-        }
-
-        socket.container = container;
-
-        console.log(`[${socket.shortid}] created container with ID: ${container.id}`);
-
-        socket.container.start(function(err, container) {
-
-            // Create terminal for console
-            socket.term = pty.spawn('docker', ['exec', '-it', socket.container.id, '/etc/startup.sh'], {
-                name: 'xterm-color',
-                cols: 120,
-                rows: 40,
-                cwd: process.env.HOME,
-                env: process.env,
-            });
-
-            // Create terminal for code
-            // socket.code = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash', '-c', 'stty -echo;/etc/stl.sh'], {
-            socket.code = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash'], {
-                name: 'xterm-color',
-                cols: 120,
-                rows: 40,
-            });
-
-            socket.tcpdump = pty.spawn('docker', ['exec', '-it', socket.container.id, 'bash', '-c', '/etc/tcpdump -i any'], {
-                name: 'xterm-color',
-                cols: 120,
-                rows: 40,
-            });
-
-            let tcp_dump_buffer = Buffer.from('');
-
-            // Listen on the terminal for output and send it to the client
-            socket.tcpdump.on('data', function(data) {
-                if (tcp_dump_buffer.length < 1024) {
-                    tcp_dump_buffer += data;
-                }
-            });
-
-            function publishTCPDump() {
-                if (tcp_dump_buffer.length > 0) {
-                    socket.emit('tcpdump-output', tcp_dump_buffer);
-                    tcp_dump_buffer = Buffer.from('');
-                }
-                setTimeout(publishTCPDump, 500);
-            }
-
-            setTimeout(publishTCPDump, 500);
-
-            // Listen on the terminal for output and send it to the client
-            socket.term.on('data', function(data) {
-                //console.log('got output: ' + data);
-                socket.emit('console-output', data);
-            });
-
-            socket.on('console-input', function(data) {
-                //console.log('got input: ' + data);
-                socket.term.write(data);
-            });
-
-            // Listen on the terminal for output and send it to the client
-            socket.code.on('data', function(data) {
-                //console.log('got output: ' + data);
-                socket.emit('code-run-output', data);
-            });
-
-            socket.on('code-run-input', function(code) {
-                if (code == 'ESC') {
-                    socket.code.write(String.fromCharCode(3));
-                    return;
-                }
-
-                // generate a temporary file
-                const tmpobj = tmp.fileSync({ mode: 0644, postfix: '.py', dir: 'shared' });
-                fs.writeFileSync(tmpobj.name, code);
-                socket.code.write(`python /${tmpobj.name}\n`);
-                return;
-            });
-            // When socket disconnects, destroy the terminal
-            socket.on('disconnect', function() {
-
-                console.log(`[${socket.shortid}] disconnecting...`);
-
-                if (socket.container) {
-                    console.log(`[${socket.shortid}] removing container: ${socket.container.id}`);
-                    socket.container.remove({ force: true });
-                    socket.container = null;
-                }
-
-                if (socket.trem) {
-                    socket.term.destroy();
-                    socket.term = null;
-                }
-
-                if (socket.code) {
-                    socket.code.destroy();
-                    socket.code = null;
-                }
-            });
-
-        });
-
+io.on('connection', (socket) => {
+  // Use docker-compose to start all services defined in the docker-compose.yml file
+  upAll({ cwd: path.join(__dirname), log: true })
+    .then(() => {
+      console.log('docker-compose services started');
+      socket.emit('console-output', 'docker-compose services started');
+    })
+    .catch((err) => {
+      console.error('Something went wrong:', err.message);
+      socket.emit('console-error', 'Error starting docker-compose services');
     });
+
+  socket.on('console-input', (data) => {
+    exec('trex', ['zsh', '-c', data], { cwd: path.join(__dirname) })
+      .then((result) => {
+        if (result.exitCode === 0) {
+          socket.emit('console-output', result.out);
+        } else {
+          socket.emit('console-output', `Error: ${result.err}`);
+        }
+      })
+      .catch((err) => {
+        console.error('Exec command failed:', err.message);
+        socket.emit('console-error', `Exec command failed: ${err.message}`);
+      });
+  });
+
+  socket.on('disconnect', () => {
+    // Use docker-compose to stop all services when the user disconnects
+    down({ cwd: path.join(__dirname), log: true })
+      .then(() => {
+        console.log('docker-compose services stopped');
+      })
+      .catch((err) => {
+        console.error('Something went wrong while stopping services:', err.message);
+      });
+  });
 });
 
+server.listen(7171, () => {
+  console.log('Server listening on port 7171');
+});
 
-process.on('SIGINT', function () {
-
-    console.log('\n*** shutting down IO...\n');
+process.on('SIGINT', () => {
+  // Handle graceful shutdown
+  down({ cwd: path.join(__dirname), log: true }).then(() => {
+    console.log('docker-compose services stopped due to application shutdown');
     server.close();
     io.close();
-
     process.exit();
+  }).catch((err) => {
+    console.error('Something went wrong while stopping services due to application shutdown:', err.message);
+    process.exit(1);
+  });
 });
-

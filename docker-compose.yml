@@ -1,0 +1,83 @@
+version: "3.8"
+services:
+  frr:
+    image: jodis/frr:latest
+    restart: unless-stopped
+    container_name: frr
+    privileged: true
+    stdin_open: true
+    ports:
+      - "161-162:161-162"
+      - "1122:22"
+    cap_add:
+      - "ALL"
+    tty: true
+    networks:
+      eth0:
+        ipv4_address: 12.34.56.4
+      eth1:
+        ipv4_address: 12.34.66.4
+      eth2:
+        ipv4_address: 12.34.76.4
+      eth3:
+        ipv4_address: 12.34.86.4
+      eth4:
+        ipv4_address: 12.34.96.4
+
+  trex:
+    image: jodis/trex:latest
+    restart: unless-stopped
+    container_name: trex
+    privileged: true
+    stdin_open: true
+    user: root
+    tty: true
+    ports:
+      - "4500-4503:4500-4503"
+      - "2222:22"
+      - "8090:8000"
+    cap_add:
+      - "ALL"
+    environment:
+      - PYTHONPATH=/v3.04/trex_client/interactive:/v3.04/trex_client/interactive/trex_stl_lib/:/v3.04/trex_client/external_libs:/v3.04/trex_client/stf
+    command:
+      ["./t-rex-64", "--stl", "--prom", "-i", "--cfg", "/etc/trex_cfg.yaml"]
+    networks:
+      eth0:
+        ipv4_address: 12.34.56.3
+      eth1:
+        ipv4_address: 12.34.66.3
+      eth2:
+        ipv4_address: 12.34.76.3
+      eth3:
+        ipv4_address: 12.34.86.3
+      eth4:
+        ipv4_address: 12.34.96.3
+
+networks:
+  eth0:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 12.34.56.0/24
+  eth1:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 12.34.66.0/24
+  eth2:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 12.34.76.0/24
+  eth3:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 12.34.86.0/24
+  eth4:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 12.34.96.0/24
+

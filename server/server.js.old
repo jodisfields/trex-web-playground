@@ -1,0 +1,108 @@
+const express = require('express');
+const http = require('http');
+const fs = require('fs');
+const Docker = require('dockerode');
+const io = require('socket.io');
+
+const app = express();
+app.use('/', express.static('client'));
+
+const server = http.createServer(app);
+const ioServer = io(server);
+
+const docker = new Docker();
+
+ioServer.on('connection', (socket) => {
+  const frrConfig = {
+    Image: 'jodis/frr:latest',
+    restart: 'unless-stopped',
+    container_name: 'frr',
+    privileged: true,
+    stdin_open: true,
+    tty: true,
+    HostConfig: {
+      NetworkMode: 'default',
+    },
+  };
+
+  docker.createContainer(frrConfig, (err, container) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+
+    container.start();
+    socket.container = container;
+
+    const trexConfig = {
+      Image: 'jodis/trex:latest',
+      restart: 'unless-stopped',
+      container_name: 'trex',
+      privileged: true,
+      stdin_open: true,
+      tty: true,
+      Env: [`PYTHONPATH=/v3.04/trex_client/interactive:/v3.04/trex_client/interactive/trex_stl_lib/:/v3.04/trex_client/external_libs:/v3.04/trex_client/stf`, `DOCKER_HOST=/var/run/docker.sock`],
+      HostConfig: {
+        NetworkMode: 'default',
+      },
+    };
+
+    docker.createContainer(trexConfig, (err, container) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+
+      container.start();
+      socket.trexContainer = container;
+
+      container.attach({ stream: true, stdout: true, stderr: true }, (err, stream) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
+
+        stream.on('data', (data) => {
+          socket.emit('console-output', data);
+        });
+      });
+
+      socket.on('console-input', (data) => {
+        container.exec({
+          Cmd: ['sh', '-c', `echo "${data}" | docker exec -i ${socket.trexContainer.id} /bin/sh`],
+        }, (err, exec) => {
+          if (err) {
+            console.error(err);
+            return;
+          }
+
+          exec.start({ stream: true }, (err, stream) => {
+            if (err) {
+              console.error(err);
+              return;
+            }
+
+            stream.on('data', (data) => {
+              socket.emit('console-output', data);
+            });
+          });
+        });
+      });
+
+      socket.on('disconnect', () => {
+        container.remove({ force: true });
+        socket.container.remove({ force: true });
+      });
+    });
+  });
+});
+
+server.listen(7171, () => {
+  console.log('Server listening on port 7171');
+});
+
+process.on('SIGINT', () => {
+  server.close();
+  ioServer.close();
+  process.exit();
+});
