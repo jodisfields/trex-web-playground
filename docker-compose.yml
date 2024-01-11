@@ -11,6 +11,8 @@ services:
       - "1122:22"
     cap_add:
       - "ALL"
+    volumes:
+      - ./shared:/shared:rw
     tty: true
     networks:
       eth0:
@@ -43,7 +45,14 @@ services:
     volumes:
       - ./shared:/shared:rw
     command:
-      ["./t-rex-64", "--stl", "--prom", "-i", "--cfg", "/etc/trex_cfg.yaml"]
+      [
+        "./t-rex-64",
+        "--stl",
+        "--prom",
+        "-i",
+        "--cfg",
+        "/etc/trex_cfg.yaml"
+      ]
     networks:
       eth0:
         ipv4_address: 12.34.56.3
@@ -82,4 +91,3 @@ networks:
     ipam:
       config:
         - subnet: 12.34.96.0/24
-

@@ -8,7 +8,7 @@ function setup_tabs() {
     $('#outputtabs').tabs({
         activate: function (event, ui) {
             const active = $('#outputtabs').tabs('option', 'active');
-            if (active == 0)  {
+            if (active == 0) {
                 document.querySelectorAll('a[href="#console"]')[0].style.color = 'black';
             } else if (active == 1) {
                 document.querySelectorAll('a[href="#output"]')[0].style.color = 'black';
@@ -106,9 +106,9 @@ function create_terminals() {
     client.terminals.tcpdump.open(document.getElementById('tcpdump'));
 
     // register some events
-    client.terminals.console.on('data', function(data) {
+    client.terminals.console.on('data', function (data) {
         client.socket.emit('console-input', data);
-	});
+    });
 }
 
 
@@ -120,7 +120,7 @@ function create_socket() {
     client.socket.on('disconnect', deinit);
 
     // console output
-    client.socket.on('console-output', function(data) {
+    client.socket.on('console-output', function (data) {
         client.terminals.console.write(data);
 
         if ($('#outputtabs').tabs('option', 'active') != 0) {
@@ -129,7 +129,7 @@ function create_socket() {
     });
 
     // code output
-    client.socket.on('code-run-output', function(data) {
+    client.socket.on('code-run-output', function (data) {
         const ss = data.split('\n');
         for (let s in ss) {
             client.terminals.code.writeln(ss[s]);
@@ -141,7 +141,7 @@ function create_socket() {
     })
 
     // tcpdump output
-    client.socket.on('tcpdump-output', function(data) {
+    client.socket.on('tcpdump-output', function (data) {
         client.terminals.tcpdump.write(data);
 
         if ($('#outputtabs').tabs('option', 'active') != 2) {
@@ -185,8 +185,8 @@ function init() {
     create_terminals();
     create_editors();
 
-    client.terminals.console.write('Allocating TRex Docker container...\r\n\n');
-    client.terminals.console.write('Starting TRex Server...\r\n\n');
+    client.terminals.console.write('Starting Trex Container...\r\n\n');
+    client.terminals.console.write('Starting Trex Server...\r\n\n');
 }
 
 function deinit() {
